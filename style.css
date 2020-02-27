@@ -1,0 +1,13 @@
+/* Remove default spacing. */
+* {
+	margin: 0;
+	padding: 0;
+	box-sizing: border-box;
+}
+
+/* Make canvas fill window. */
+html, body, canvas {
+	width: 100%;
+	/* height: 100%; */
+	image-rendering: pixelated;
+}

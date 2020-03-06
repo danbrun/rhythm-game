@@ -16,6 +16,23 @@ async function loadImage(url) {
 	});
 }
 
+// Load audio asynchronously.
+async function loadAudio(url) {
+	return new Promise((resolve, reject) => {
+		let audio = new Audio();
+
+		audio.addEventListener('canplaythrough', function () {
+			resolve(audio);
+		});
+
+		audio.addEventListener('error', function (event) {
+			reject(event);
+		});
+
+		audio.src = url;
+	});
+}
+
 // Zip 2 arrays into an object.
 function zip(keys, values) {
 	let object = {};
@@ -27,57 +44,107 @@ function zip(keys, values) {
 	return object;
 }
 
+// Speed is 2 tiles per second.
+const SPEED = 2 / 1000;
+const JUMP_HEIGHT = 1;
+const JUMP_WIDTH = 2;
+
+const DISPLAY_WIDTH = 8;
+
 // Global variables for the game.
 let context;
 let images;
+let audio;
+let start;
+
+let obstacle_times = [
+	1100,
+	3070,
+	5030,
+	7000,
+	8220,
+	10190,
+	12160,
+	14130,
+];
+
+// Convert obstacle timing to tile positions.
+let obstacle_tiles = [];
+for (let i = 0; i < obstacle_times.length; i++) {
+	obstacle_tiles[i] = Math.floor(obstacle_times[i] * SPEED) + 2;
+}
 
 // Store the time of the last jump.
-let jumpTime;
+let jumpStart;
 
 // Make the player jump.
 function jump() {
 	// Only update if not already set.
-	if (!jumpTime) {
-		jumpTime = new Date().getTime();
+	if (!jumpStart) {
+		jumpStart = getDistance();
 	}
 }
 
+// Get distance travelled.
+function getDistance() {
+	return (new Date().getTime() - start) * SPEED;
+}
+
+// Convert tile distance to pixels.
+function tilesToPixels(tiles) {
+	return Math.floor(tiles * 32);
+}
+
 function render() {
-	let currentTime = new Date().getTime();
+	let distance = getDistance();
+
+	// Get the first tile and the offset to shift tiles.
+	let tile = Math.floor(distance);
+	let offset = distance - tile;
 
 	// Draw background.
 	context.drawImage(images['Background'], 0, 0);
 
-	// Shift 1 pixel 80 times per second. Reset to 0 after 31 pixels.
-	let shift = Math.floor(currentTime * 80 / 1000) % 32;
-
-	// Draw ground.
-	for (let index = 0; index <= 256; index += 32) {
-		context.drawImage(images['Base_Tile_Square'], index - shift, 112);
+	// Draw parallax at half speed.
+	for (let index = 0; index <= 1; index++) {
+		context.drawImage(images['Parallax1'], tilesToPixels(-distance / 2 % 16 + index * 16), 0);
 	}
 
-	// Switch player animation frames 8 times per second. Wrap to frame 0 after frame 3.
-	let frame = Math.floor(currentTime * 8 / 1000) % 4;
+	// Draw ground by rendering 8 tiles shifted by the offset.
+	for (let index = 0; index <= 8; index++) {
+		context.drawImage(images['Base_Tile_Square'], tilesToPixels(index - offset), 112);
+	}
 
-	// Assume player is on the ground.
-	let playerShift = 0;
+	// Iterate over obstacles in the game.
+	for (let obstacle_tile of obstacle_tiles) {
+		// If the obstacle is on the screen.
+		if (tile <= obstacle_tile && obstacle_tile <= tile + DISPLAY_WIDTH) {
+			// Draw the obstacle.
+			context.drawImage(images['Spike_Tile_Square'], tilesToPixels(obstacle_tile - tile - offset), tilesToPixels(2.5));
+		}
+	}
+
+	// Cycle player through 4 animation frames per tile travelled.
+	let frame = Math.floor((distance - tile) * 4 % 4);
+
+	let jumpOffset = 0;
 
 	// If a jump is occurring.
-	if (jumpTime) {
-		// Get progress in 1 second jump.
-		let jumpPercent = (currentTime - jumpTime) / 500;
+	if (jumpStart) {
+		// Get the distance travelled in the jump.
+		let jumpDistance = distance - jumpStart;
 
-		// If the jump has completed, reset the start time.
-		if (jumpPercent >= 1) {
-			jumpTime = null;
+		if (jumpDistance < JUMP_WIDTH) {
+			// If the jump is not finished, update the player offset.
+			jumpOffset = JUMP_HEIGHT * (1 - Math.pow(2 * jumpDistance / JUMP_WIDTH - 1, 2));
 		} else {
-			// Set the player shift based on an exponential function.
-			playerShift = ((4 * jumpPercent) - (4 * Math.pow(jumpPercent, 2))) * 32;
+			// Otherwise end the jump.
+			jumpStart = null;
 		}
 	}
 
 	// Draw the player tile.
-	context.drawImage(images['Player_Idle_Square-Sheet'], frame * 32, 0, 32, 32, 0, 80 - playerShift, 32, 32);
+	context.drawImage(images['Player_Idle_Square-Sheet'], frame * 32, 0, 32, 32, 0, tilesToPixels(2.5 - jumpOffset), 32, 32);
 
 	// Request another frame.
 	requestAnimationFrame(render);
@@ -92,6 +159,7 @@ async function startGame() {
 	let image_names = [
 		'Background',
 		'Base_Tile_Square',
+		'Parallax1',
 		'Player_Idle_Square-Sheet',
 		'Spike_Tile_Square',
 		'Title_Screen'
@@ -113,6 +181,12 @@ async function startGame() {
 
 	// Listening for clicks on the canvas to jump.
 	canvas.addEventListener('click', jump);
+
+	audio = await loadAudio('assets/music/MV Final Project Tutorial Section.wav');
+	audio.play();
+
+	// Set the start time.
+	start = new Date().getTime();
 
 	// Start animating.
 	requestAnimationFrame(render);

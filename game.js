@@ -45,7 +45,9 @@ function zip(keys, values) {
 }
 
 // Speed is 2 tiles per second.
-const SPEED = 2 / 1000;
+const BEATS_PER_MINUTE = 128;
+const TILES_PER_BEAT = 1;
+const SPEED = BEATS_PER_MINUTE * TILES_PER_BEAT / 60 / 1000;
 const JUMP_HEIGHT = 1;
 const JUMP_WIDTH = 2;
 
@@ -58,20 +60,20 @@ let audio;
 let start;
 
 let obstacle_times = [
-	1100,
-	3070,
-	5030,
+	1410,
+	3290,
+	5125,
 	7000,
-	8220,
-	10190,
-	12160,
-	14130,
+	8910,
+	10790,
+	12670,
+	14540,
 ];
 
 // Convert obstacle timing to tile positions.
 let obstacle_tiles = [];
 for (let i = 0; i < obstacle_times.length; i++) {
-	obstacle_tiles[i] = Math.floor(obstacle_times[i] * SPEED) + 2;
+	obstacle_tiles[i] = Math.floor(obstacle_times[i] * SPEED) + 1;
 }
 
 // Store the time of the last jump.
@@ -179,10 +181,30 @@ async function startGame() {
 	// Zip images into an object.
 	images = zip(image_names, image_elements);
 
-	// Listening for clicks on the canvas to jump.
-	canvas.addEventListener('click', jump);
-
+	// Preload music.
 	audio = await loadAudio('assets/music/MV Final Project Tutorial Section.wav');
+
+	// Function to show title screen.
+	async function showTitle() {
+		// Returns a promise to wait for click.
+		return new Promise((resolve, reject) => {
+			// Draw the title screen image.
+			context.drawImage(images['Title_Screen'], 0, 0);
+
+			// On user click input.
+			canvas.addEventListener('click', function titleClick() {
+				// Remove the listener and close the title screen.
+				canvas.removeEventListener('click', titleClick);
+				resolve();
+			});
+		});
+	};
+
+	// Wait for title screen to be closed.
+	await showTitle();
+
+	// Listening for clicks on the canvas to jump.
+	canvas.addEventListener('mousedown', jump);
 	audio.play();
 
 	// Set the start time.

@@ -1,0 +1,35 @@
+{
+	"audio": {
+		"beats_per_minute": 128,
+		"source": "assets/audio/MV Final Project Tutorial Section.wav"
+	},
+	"images": {
+		"background": {
+			"source": "assets/images/Background.png"
+		},
+		"parallax": {
+			"source": "assets/images/Parallax1.png"
+		},
+		"ground": {
+			"source": "assets/images/Base_Tile_Square.png"
+		},
+		"spikes": {
+			"source": "assets/images/Spike_Tile_Square.png"
+		},
+		"player": {
+			"source": "assets/images/Player_Idle_Square-Sheet.png"
+		}
+	},
+	"map": {
+		"spike_times": [
+			1.410,
+			3.290,
+			5.125,
+			7.000,
+			8.910,
+			10.790,
+			12.670,
+			14.540
+		]
+	}
+}

@@ -5,7 +5,9 @@
 	},
 	"images": {
 		"background": {
-			"source": "assets/images/Background.png"
+			"type": "gradient",
+			"start": "#2efe92",
+			"stop": "#42407a"
 		},
 		"parallax": {
 			"source": "assets/images/Parallax1.png"

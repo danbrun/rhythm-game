@@ -236,7 +236,9 @@ class BasicLevel extends View {
 
 		// Load all of the image files.
 		for (let [name, data] of Object.entries(this._config.images)) {
-			promises.push(loadImage(data.source).then(image => this._images[name] = image));
+			if (data.source) {
+				promises.push(loadImage(data.source).then(image => this._images[name] = image));
+			}
 		}
 
 		await Promise.all(promises)
@@ -257,8 +259,14 @@ class BasicLevel extends View {
 		let tile = Math.floor(distance);
 		let offset = distance - tile;
 
+		// Create the background gradient.
+		var gradient = context.createLinearGradient(0, 0, 0, DISPLAY_HEIGHT * PIXELS_PER_TILE);
+		gradient.addColorStop(0, this._config.images.background.start);
+		gradient.addColorStop(1, this._config.images.background.stop);
+
 		// Draw the background.
-		context.drawImage(this._images['background'], 0, 0);
+		context.fillStyle = gradient;
+		context.fillRect(0, 0, DISPLAY_WIDTH * PIXELS_PER_TILE, DISPLAY_HEIGHT * PIXELS_PER_TILE);
 
 		// Draw parallax at half speed.
 		for (let index = 0; index <= 1; index++) {

@@ -378,9 +378,10 @@ async function start() {
 	// Add the title screen view.
 	game.add_view('title_screen', new TitleScreen());
 
-	// Load in views for levels 1 and 2.
+	// Load in views for levels 1, 2, and 3.
 	game.add_view('level_1', await BasicLevel.import('1'));
 	game.add_view('level_2', await BasicLevel.import('2'));
+	game.add_view('level_3', await BasicLevel.import('3'));
 
 	// Start with the title screen view.
 	game.set_view('title_screen');

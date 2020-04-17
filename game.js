@@ -385,6 +385,20 @@ async function start() {
 
 	// Start with the title screen view.
 	game.set_view('title_screen');
+
+	window.addEventListener('keypress', function () {
+		switch (event.key) {
+			case '1':
+				game.set_view('level_1');
+				break;
+			case '2':
+				game.set_view('level_2');
+				break;
+			case '3':
+				game.set_view('level_3');
+				break;
+		}
+	});
 }
 
 start();

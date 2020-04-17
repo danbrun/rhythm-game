@@ -190,14 +190,8 @@ class Game {
 		if (!this._pressing) {
 			this._pressing = true;
 
-			// If something is overriding press functionality.
-			if (this._press_override) {
-				// Call the press override function.
-				this._press_override(this, x, y);
-			} else {
-				// Call the view press function.
-				this.view.press(this, x, y);
-			}
+			// Call the view press function.
+			this.view.press(this, x, y);
 
 			this._pressing = false;
 		}
@@ -325,17 +319,25 @@ class BasicLevel extends View {
 				if (obstacle_tile - 0.75 <= distance && distance <= obstacle_tile + 0.75) {
 					// Stop the game.
 					game.stop();
-					// Override press functionality to restart level.
-					game._press_override = () => {
-						game.start();
-						game._press_override = null;
-					};
+
+					// Darken the game.
+					context.fillStyle = '#00000088';
+					context.fillRect(0, 0, DISPLAY_WIDTH * PIXELS_PER_TILE, DISPLAY_HEIGHT * PIXELS_PER_TILE);
+
+					// Draw the game over screen.
+					context.drawImage(this._images.retry, 0, 0);
+
+					// Mark when the player lost.
+					this._time_of_loss = new Date().getTime();
 				}
 			}
 		}
 	}
 
 	start(game) {
+		this._time_of_loss = null;
+		this._jump_start = undefined;
+
 		// Start the music.
 		this._audio.play();
 	}
@@ -347,9 +349,15 @@ class BasicLevel extends View {
 	}
 
 	press(game, x, y) {
-		// If the player is not mid-jump.
-		if (isNaN(this._jump_start)) {
-			// Set the current poisition as the jump start point.
+		// If the player has lost the game.
+		if (this._time_of_loss) {
+			// Wait a second before letting them retry.
+			if (new Date().getTime() - this._time_of_loss > 1000) {
+				this._time_of_loss = null;
+				game.start();
+			}
+		} else if (isNaN(this._jump_start)) {
+			// If the player is not mid-jump, set the current poisition as the jump start point.
 			this._jump_start = game.elapsed * this._speed;
 		}
 	}

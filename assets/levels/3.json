@@ -20,6 +20,9 @@
 		},
 		"player": {
 			"source": "assets/images/Player_Idle_Square-Sheet.png"
+		},
+		"retry": {
+			"source": "assets/images/gameover.png"
 		}
 	},
 	"map": {

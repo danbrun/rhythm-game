@@ -50,6 +50,8 @@ class View {
 	render(game, context) { }
 
 	async press(game, x, y) { }
+
+	stop() { }
 }
 
 class Game {
@@ -124,6 +126,7 @@ class Game {
 	stop() {
 		this._running = false;
 		this._start_time = null;
+		this._view_values[this._view_index].stop();
 	}
 
 	get elapsed() {
@@ -308,6 +311,24 @@ class BasicLevel extends View {
 
 		// Draw the player tile.
 		context.drawImage(this._images['player'], frame * 32, 0, 32, 32, 0, (2.5 - jumpOffset) * PIXELS_PER_TILE, 32, 32);
+
+		// Check for collisions.
+		if (!this._jump_start) {
+			// If not mid-jump, check if the player is in an obstacle.
+			for (let obstacle_tile of this._map) {
+				// If the player is within the spike range, failure has occurred.
+				if (obstacle_tile - 0.75 <= distance && distance <= obstacle_tile + 0.75) {
+					// Stop the game.
+					game.stop();
+				}
+			}
+		}
+	}
+
+	stop() {
+		// Stop the music.
+		this._audio.pause();
+		this._audio.currentTime = 0;
 	}
 
 	press(game, x, y) {

@@ -50,6 +50,10 @@ class View {
 	render(game, context) { }
 
 	async press(game, x, y) { }
+
+	start(game) { }
+
+	stop() { }
 }
 
 class Game {
@@ -118,12 +122,14 @@ class Game {
 	start() {
 		this._running = true;
 		this._start_time = new Date().getTime();
+		this._view_values[this._view_index].start(this);
 		this.render(this._view);
 	}
 
 	stop() {
 		this._running = false;
 		this._start_time = null;
+		this._view_values[this._view_index].stop();
 	}
 
 	get elapsed() {
@@ -236,18 +242,16 @@ class BasicLevel extends View {
 
 		// Load all of the image files.
 		for (let [name, data] of Object.entries(this._config.images)) {
-			promises.push(loadImage(data.source).then(image => this._images[name] = image));
+			if (data.source) {
+				promises.push(loadImage(data.source).then(image => this._images[name] = image));
+			}
 		}
 
 		await Promise.all(promises)
 	}
 
 	render(game, context) {
-		if (this._audio.currentTime <= 0) {
-			// If the audio hasn't started yet, sync it with the level and start.
-			this._audio.currentTime = game.elapsed;
-			this._audio.play();
-		} else if (this._audio.ended) {
+		if (this._audio.ended) {
 			// If the song has ended, go to the next level.
 			game.next_view();
 		}
@@ -257,8 +261,14 @@ class BasicLevel extends View {
 		let tile = Math.floor(distance);
 		let offset = distance - tile;
 
+		// Create the background gradient.
+		var gradient = context.createLinearGradient(0, 0, 0, DISPLAY_HEIGHT * PIXELS_PER_TILE);
+		gradient.addColorStop(0, this._config.images.background.start);
+		gradient.addColorStop(1, this._config.images.background.stop);
+
 		// Draw the background.
-		context.drawImage(this._images['background'], 0, 0);
+		context.fillStyle = gradient;
+		context.fillRect(0, 0, DISPLAY_WIDTH * PIXELS_PER_TILE, DISPLAY_HEIGHT * PIXELS_PER_TILE);
 
 		// Draw parallax at half speed.
 		for (let index = 0; index <= 1; index++) {
@@ -300,12 +310,54 @@ class BasicLevel extends View {
 
 		// Draw the player tile.
 		context.drawImage(this._images['player'], frame * 32, 0, 32, 32, 0, (2.5 - jumpOffset) * PIXELS_PER_TILE, 32, 32);
+
+		// Check for collisions.
+		if (!this._jump_start) {
+			// If not mid-jump, check if the player is in an obstacle.
+			for (let obstacle_tile of this._map) {
+				// If the player is within the spike range, failure has occurred.
+				if (obstacle_tile - 0.75 <= distance && distance <= obstacle_tile + 0.75) {
+					// Stop the game.
+					game.stop();
+
+					// Darken the game.
+					context.fillStyle = '#00000088';
+					context.fillRect(0, 0, DISPLAY_WIDTH * PIXELS_PER_TILE, DISPLAY_HEIGHT * PIXELS_PER_TILE);
+
+					// Draw the game over screen.
+					context.drawImage(this._images.retry, 0, 0);
+
+					// Mark when the player lost.
+					this._time_of_loss = new Date().getTime();
+				}
+			}
+		}
+	}
+
+	start(game) {
+		this._time_of_loss = null;
+		this._jump_start = undefined;
+
+		// Start the music.
+		this._audio.play();
+	}
+
+	stop() {
+		// Stop the music.
+		this._audio.pause();
+		this._audio.currentTime = 0;
 	}
 
 	press(game, x, y) {
-		// If the player is not mid-jump.
-		if (isNaN(this._jump_start)) {
-			// Set the current poisition as the jump start point.
+		// If the player has lost the game.
+		if (this._time_of_loss) {
+			// Wait a second before letting them retry.
+			if (new Date().getTime() - this._time_of_loss > 1000) {
+				this._time_of_loss = null;
+				game.start();
+			}
+		} else if (isNaN(this._jump_start)) {
+			// If the player is not mid-jump, set the current poisition as the jump start point.
 			this._jump_start = game.elapsed * this._speed;
 		}
 	}
@@ -334,12 +386,27 @@ async function start() {
 	// Add the title screen view.
 	game.add_view('title_screen', new TitleScreen());
 
-	// Load in views for levels 1 and 2.
+	// Load in views for levels 1, 2, and 3.
 	game.add_view('level_1', await BasicLevel.import('1'));
 	game.add_view('level_2', await BasicLevel.import('2'));
+	game.add_view('level_3', await BasicLevel.import('3'));
 
 	// Start with the title screen view.
 	game.set_view('title_screen');
+
+	window.addEventListener('keypress', function () {
+		switch (event.key) {
+			case '1':
+				game.set_view('level_1');
+				break;
+			case '2':
+				game.set_view('level_2');
+				break;
+			case '3':
+				game.set_view('level_3');
+				break;
+		}
+	});
 }
 
 start();

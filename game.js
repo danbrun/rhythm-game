@@ -51,6 +51,8 @@ class View {
 
 	async press(game, x, y) { }
 
+	start(game) { }
+
 	stop() { }
 }
 
@@ -120,6 +122,7 @@ class Game {
 	start() {
 		this._running = true;
 		this._start_time = new Date().getTime();
+		this._view_values[this._view_index].start(this);
 		this.render(this._view);
 	}
 
@@ -187,8 +190,14 @@ class Game {
 		if (!this._pressing) {
 			this._pressing = true;
 
-			// Call the view press function.
-			this.view.press(this, x, y);
+			// If something is overriding press functionality.
+			if (this._press_override) {
+				// Call the press override function.
+				this._press_override(this, x, y);
+			} else {
+				// Call the view press function.
+				this.view.press(this, x, y);
+			}
 
 			this._pressing = false;
 		}
@@ -248,11 +257,7 @@ class BasicLevel extends View {
 	}
 
 	render(game, context) {
-		if (this._audio.currentTime <= 0) {
-			// If the audio hasn't started yet, sync it with the level and start.
-			this._audio.currentTime = game.elapsed;
-			this._audio.play();
-		} else if (this._audio.ended) {
+		if (this._audio.ended) {
 			// If the song has ended, go to the next level.
 			game.next_view();
 		}
@@ -320,9 +325,19 @@ class BasicLevel extends View {
 				if (obstacle_tile - 0.75 <= distance && distance <= obstacle_tile + 0.75) {
 					// Stop the game.
 					game.stop();
+					// Override press functionality to restart level.
+					game._press_override = () => {
+						game.start();
+						game._press_override = null;
+					};
 				}
 			}
 		}
+	}
+
+	start(game) {
+		// Start the music.
+		this._audio.play();
 	}
 
 	stop() {

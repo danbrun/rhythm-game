@@ -8,13 +8,13 @@
 			"source": "assets/images/Background.png"
 		},
 		"parallax": {
-			"source": "assets/images/Parallax1.png"
+			"source": "assets/images/Parallax2.png"
 		},
 		"ground": {
-			"source": "assets/images/Base_Tile_Square.png"
+			"source": "assets/images/Tile_2.png"
 		},
 		"spikes": {
-			"source": "assets/images/Spike_Tile_Square.png"
+			"source": "assets/images/Spike_Tile_2.png"
 		},
 		"player": {
 			"source": "assets/images/Player_Idle_Square-Sheet.png"

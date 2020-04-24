@@ -41,7 +41,7 @@ const BEATS_PER_MINUTE = 128;
 const TILES_PER_BEAT = 1;
 const SPEED = BEATS_PER_MINUTE * TILES_PER_BEAT / 60 / 1000;
 const JUMP_HEIGHT = 1;
-const JUMP_WIDTH = 2;
+const JUMP_WIDTH = 1.75;
 
 // View interface defines a renderable view for the game.
 class View {
@@ -73,6 +73,16 @@ class Game {
 
 		this._running = false;
 		this._start_time = null;
+	}
+
+	async load() {
+		// Load the border images.
+		this._borders = {
+			top: await loadImage('assets/images/top_tiled.png'),
+			left: await loadImage('assets/images/left_tiled.png'),
+			right: await loadImage('assets/images/right_tiled.png'),
+			bottom: await loadImage('assets/images/bottom_tiled.png'),
+		};
 	}
 
 	get size() {
@@ -170,11 +180,25 @@ class Game {
 
 		// Disable image smoothing to retain pixel clarity.
 		this._context.imageSmoothingEnabled = false;
-		// Transform the context so the game context is full size.
-		this._context.transform(...this.get_transform());
+
+		// Get the transform and transform the context so the game context is full size.
+		let transform = this.get_transform();
+		this._context.transform(...transform);
 
 		// Perform level rendering.
 		this.view.render(this, this._context);
+
+		// Render the left and right borders.
+		for (var x = 0; x < transform[4] / transform[0]; x += 32) {
+			this._context.drawImage(this._borders.left, -PIXELS_PER_TILE - x, 0);
+			this._context.drawImage(this._borders.right, this._width + x, 0);
+		}
+
+		// Render the top and bottom borders.
+		for (var y = 0; y < transform[5] / transform[0]; y += 32) {
+			this._context.drawImage(this._borders.top, 0, -PIXELS_PER_TILE - y);
+			this._context.drawImage(this._borders.bottom, 0, this._height + y);
+		}
 
 		// Restore the state of the canvas context.
 		this._context.restore();
@@ -379,6 +403,7 @@ async function start() {
 
 	// Create a game using the canvas.
 	let game = new Game(canvas);
+	await game.load();
 
 	// Set the game rendering size.
 	game.size = [DISPLAY_WIDTH * PIXELS_PER_TILE, DISPLAY_HEIGHT * PIXELS_PER_TILE];

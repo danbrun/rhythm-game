@@ -63,7 +63,7 @@ const BEATS_PER_MINUTE = 128;
 const TILES_PER_BEAT = 1;
 const SPEED = BEATS_PER_MINUTE * TILES_PER_BEAT / 60 / 1000;
 const JUMP_HEIGHT = 1;
-const JUMP_WIDTH = 1.75;
+const JUMP_WIDTH = 1.8;
 
 // View interface defines a renderable view for the game.
 class View {

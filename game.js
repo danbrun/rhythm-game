@@ -61,8 +61,9 @@ class Game {
 		this._canvas = canvas;
 		this._context = canvas.getContext('2d');
 
-		// Bind the press function to the canvas click.
-		this._canvas.addEventListener('mousedown', () => this.press());
+		// Bind mouse and touch events to input handlers.
+		this._canvas.addEventListener('mousedown', event => this.mousedown(event));
+		this._canvas.addEventListener('touchstart', event => this.touchstart(event));
 
 		this._width = 0;
 		this._height = 0;
@@ -207,6 +208,34 @@ class Game {
 		if (this._running) {
 			requestAnimationFrame(() => this.render());
 		}
+	}
+
+	mousedown(event) {
+		console.log(event)
+
+		// Press using the localized game coordinates.
+		this.press(...this.localize(event.clientX, event.clientY));
+	}
+
+	touchstart(event) {
+		let touch = event.touches[0];
+
+		this.press(...this.localize(touch.clientX, touch.clientY))
+
+		// Cancel the mousedown event.
+		event.preventDefault();
+	}
+
+	localize(x, y) {
+		// Get the view transformation.
+		let transform = this.get_transform();
+
+		// Calculate the transformed coordinates of the click.
+		x = (event.x - transform[4]) / transform[0];
+		y = (event.y - transform[5]) / transform[3];
+
+		// Return the game coordinates.
+		return [x, y];
 	}
 
 	press(x, y) {

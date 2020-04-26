@@ -33,6 +33,28 @@ async function loadAudio(url) {
 	});
 }
 
+// Class representing a bounding box.
+class Box {
+	// Create a box with the coordinates and dimensions.
+	constructor(x, y, w, h) {
+		this._x = x;
+		this._y = y;
+		this._w = w;
+		this._h = h;
+	}
+
+	// Return true if the bounding box contains the given point.
+	contains(x, y) {
+		if (this._x <= x && x <= this._x + this._w) {
+			if (this._y <= y && y <= this._y + this._w) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+}
+
 const DISPLAY_WIDTH = 8;
 const DISPLAY_HEIGHT = 4.5;
 const PIXELS_PER_TILE = 32;
@@ -61,15 +83,15 @@ class Game {
 		this._canvas = canvas;
 		this._context = canvas.getContext('2d');
 
-		// Bind the press function to the canvas click.
-		this._canvas.addEventListener('mousedown', () => this.press());
+		// Bind mouse and touch events to input handlers.
+		this._canvas.addEventListener('mousedown', event => this.mousedown(event));
+		this._canvas.addEventListener('touchstart', event => this.touchstart(event));
 
 		this._width = 0;
 		this._height = 0;
 
-		this._view_index = 0;
-		this._view_names = [];
-		this._view_values = [];
+		this._views = {};
+		this._active_view = null;
 
 		this._running = false;
 		this._start_time = null;
@@ -95,51 +117,41 @@ class Game {
 	}
 
 	get view() {
-		return this._view_values[this._view_index];
+		return this._views[this._active_view];
 	}
 
 	add_view(name, value) {
 		// Store the view attributes.
-		this._view_names.push(name);
-		this._view_values.push(value);
+		this._views[name] = value;
 	}
 
 	async set_view(name) {
-		// Stop rendering and wait for the rendering to finish.
-		this.stop();
-
-		// Get the index of the view.
-		let index = this._view_names.indexOf(name);
+		if (this.view) {
+			// Stop rendering and wait for the rendering to finish.
+			this.stop();
+		}
 
 		// Load the new view and its assets.
-		await this._view_values[index].load();
+		await this._views[name].load();
 
 		// Switch to the new view.
-		this._view_index = index;
+		this._active_view = name;
 
 		// Start the new view.
 		this.start();
 	}
 
-	async next_view() {
-		// Get the index of the next view in the rotation.
-		let index = (this._view_index + 1) % this._view_names.length;
-
-		// Switch to the new view.
-		await this.set_view(this._view_names[index]);
-	}
-
 	start() {
 		this._running = true;
 		this._start_time = new Date().getTime();
-		this._view_values[this._view_index].start(this);
-		this.render(this._view);
+		this.view.start(this);
+		this.render();
 	}
 
 	stop() {
 		this._running = false;
 		this._start_time = null;
-		this._view_values[this._view_index].stop();
+		this.view.stop();
 	}
 
 	get elapsed() {
@@ -209,6 +221,32 @@ class Game {
 		}
 	}
 
+	mousedown(event) {
+		// Press using the localized game coordinates.
+		this.press(...this.localize(event.clientX, event.clientY));
+	}
+
+	touchstart(event) {
+		let touch = event.touches[0];
+
+		this.press(...this.localize(touch.clientX, touch.clientY))
+
+		// Cancel the mousedown event.
+		event.preventDefault();
+	}
+
+	localize(x, y) {
+		// Get the view transformation.
+		let transform = this.get_transform();
+
+		// Calculate the transformed coordinates of the click.
+		x = (event.x - transform[4]) / transform[0];
+		y = (event.y - transform[5]) / transform[3];
+
+		// Return the game coordinates.
+		return [x, y];
+	}
+
 	press(x, y) {
 		// If a press event is not already in progress.
 		if (!this._pressing) {
@@ -232,7 +270,30 @@ class TitleScreen extends View {
 	}
 
 	press(game, x, y) {
-		game.next_view();
+		game.set_view('level_select');
+	}
+}
+
+class LevelSelect extends View {
+	async load() {
+		this._level_select = await loadImage('assets/images/level_select.png');
+	}
+
+	render(_, context) {
+		context.drawImage(this._level_select, 0, 0);
+	}
+
+	press(game, x, y) {
+		if (new Box(35, 64, 39, 15).contains(x, y)) {
+			// Level 1 pressed.
+			game.set_view('level_1');
+		} else if (new Box(104, 64, 43, 15).contains(x, y)) {
+			// Level 2 pressed.
+			game.set_view('level_2');
+		} else if (new Box(179, 64, 42, 15).contains(x, y)) {
+			// Level 3 pressed.
+			game.set_view('level_3');
+		}
 	}
 }
 
@@ -276,8 +337,8 @@ class BasicLevel extends View {
 
 	render(game, context) {
 		if (this._audio.ended) {
-			// If the song has ended, go to the next level.
-			game.next_view();
+			// If the song has ended, return to the level select.
+			game.set_view('level_select');
 		}
 
 		// Get the distance travelled and in tiles and remainder.
@@ -408,8 +469,9 @@ async function start() {
 	// Set the game rendering size.
 	game.size = [DISPLAY_WIDTH * PIXELS_PER_TILE, DISPLAY_HEIGHT * PIXELS_PER_TILE];
 
-	// Add the title screen view.
+	// Add the title screen and level select views.
 	game.add_view('title_screen', new TitleScreen());
+	game.add_view('level_select', new LevelSelect());
 
 	// Load in views for levels 1, 2, and 3.
 	game.add_view('level_1', await BasicLevel.import('1'));
@@ -418,20 +480,6 @@ async function start() {
 
 	// Start with the title screen view.
 	game.set_view('title_screen');
-
-	window.addEventListener('keypress', function () {
-		switch (event.key) {
-			case '1':
-				game.set_view('level_1');
-				break;
-			case '2':
-				game.set_view('level_2');
-				break;
-			case '3':
-				game.set_view('level_3');
-				break;
-		}
-	});
 }
 
 start();

@@ -227,8 +227,10 @@ class Game {
 	}
 
 	touchstart(event) {
+		// Get first touch location.
 		let touch = event.touches[0];
 
+		// Press using the localized game coordinates.
 		this.press(...this.localize(touch.clientX, touch.clientY))
 
 		// Cancel the mousedown event.
@@ -240,8 +242,8 @@ class Game {
 		let transform = this.get_transform();
 
 		// Calculate the transformed coordinates of the click.
-		x = (event.x - transform[4]) / transform[0];
-		y = (event.y - transform[5]) / transform[3];
+		x = (x - transform[4]) / transform[0];
+		y = (y - transform[5]) / transform[3];
 
 		// Return the game coordinates.
 		return [x, y];

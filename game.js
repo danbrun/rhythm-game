@@ -1,3 +1,4 @@
+import { View, ImageView, SpriteView } from './View.js';
 
 // Load an image asynchrnously.
 async function loadImage(url) {
@@ -65,19 +66,6 @@ const SPEED = BEATS_PER_MINUTE * TILES_PER_BEAT / 60 / 1000;
 const JUMP_HEIGHT = 1;
 const JUMP_WIDTH = 1.8;
 
-// View interface defines a renderable view for the game.
-class View {
-	async load() { }
-
-	render(game, context) { }
-
-	async press(game, x, y) { }
-
-	start(game) { }
-
-	stop() { }
-}
-
 class Game {
 	constructor(canvas) {
 		this._canvas = canvas;
@@ -144,14 +132,20 @@ class Game {
 	start() {
 		this._running = true;
 		this._start_time = new Date().getTime();
-		this.view.start(this);
+
+		if (this.view.start) {
+			this.view.start(this);
+		}
 		this.render();
 	}
 
 	stop() {
 		this._running = false;
 		this._start_time = null;
-		this.view.stop();
+
+		if (this.view.stop) {
+			this.view.stop();
+		}
 	}
 
 	get elapsed() {
@@ -255,20 +249,22 @@ class Game {
 			this._pressing = true;
 
 			// Call the view press function.
-			this.view.press(this, x, y);
+			if (this.view.press) {
+				this.view.press(this, x, y);
+			}
 
 			this._pressing = false;
 		}
 	}
+
+	draw(image, ...args) {
+		this._context.drawImage(image, ...args.map(arg => arg * PIXELS_PER_TILE));
+	}
 }
 
-class TitleScreen extends View {
-	async load() {
-		this._title_screen = await loadImage('assets/images/Title_Screen.png');
-	}
-
-	render(_, context) {
-		context.drawImage(this._title_screen, 0, 0);
+class TitleScreen extends ImageView {
+	constructor() {
+		super('./assets/images/Title_Screen.png', 0, 0);
 	}
 
 	press(game, x, y) {
@@ -276,13 +272,9 @@ class TitleScreen extends View {
 	}
 }
 
-class LevelSelect extends View {
-	async load() {
-		this._level_select = await loadImage('assets/images/level_select.png');
-	}
-
-	render(_, context) {
-		context.drawImage(this._level_select, 0, 0);
+class LevelSelect extends ImageView {
+	constructor() {
+		super('./assets/images/level_select.png', 0, 0);
 	}
 
 	press(game, x, y) {
@@ -303,6 +295,9 @@ class BasicLevel extends View {
 	constructor(config) {
 		super();
 
+		// Create the player sprite.
+		this._player = new SpriteView(config.images.player.source, 4, 0, 0, 1, 1);
+
 		this._config = config;
 		this._images = {};
 
@@ -322,7 +317,7 @@ class BasicLevel extends View {
 	}
 
 	async load() {
-		let promises = [];
+		let promises = [this._player.load()];
 
 		// Load the audio file.
 		promises.push(loadAudio(this._config.audio.source).then(audio => this._audio = audio))
@@ -376,9 +371,6 @@ class BasicLevel extends View {
 			}
 		}
 
-		// Cycle player through 4 animation frames per tile travelled.
-		let frame = Math.floor((distance - tile) * 4 % 4);
-
 		let jumpOffset = 0;
 
 		// If a jump is occurring.
@@ -395,8 +387,12 @@ class BasicLevel extends View {
 			}
 		}
 
+		// Cycle player through 4 animation frames per tile travelled.
+		this._player.frame = Math.floor((distance - tile) * 4 % 4);
+		this._player.y = 2.5 - jumpOffset;
+
 		// Draw the player tile.
-		context.drawImage(this._images['player'], frame * 32, 0, 32, 32, 0, (2.5 - jumpOffset) * PIXELS_PER_TILE, 32, 32);
+		this._player.render(game);
 
 		// Check for collisions.
 		if (!this._jump_start) {

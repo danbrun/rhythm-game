@@ -22,6 +22,9 @@ class Game {
 		this._request = null;
 		this._frame = null;
 
+		// Store view-level state information.
+		this._state = {};
+
 		// Unset press flag.
 		this._pressing = false;
 	}
@@ -41,6 +44,8 @@ class Game {
 
 	// Get the last transformation applied to the canvas.
 	get transform() { return this._transform; }
+
+	get state() { return this._state; }
 
 	// Calculate the transformation needed to make the game fit the canvas.
 	get _transform() {
@@ -80,9 +85,12 @@ class Game {
 		// Wait for the view to load.
 		await this._view.load();
 
+		// Clear the game state.
+		this._state = {};
+
 		// If the view has a start handler, call it.
 		if (this._view.start) {
-			this._view.start();
+			this._view.start(this);
 		}
 
 		// Set the running flag and start time.
@@ -101,7 +109,7 @@ class Game {
 
 		// If the view has a stop handler, call it.
 		if (this._view.stop) {
-			this._view.stop();
+			this._view.stop(this);
 		}
 
 		// Unset the running flag and start time.

@@ -111,18 +111,76 @@ class LevelSelect extends ImageView {
 	}
 }
 
+// Renders the player character and handles jumping.
+class PlayerView extends SpriteView {
+	// Creates a player view using an image, number of frames, movement speed, and jump dimensions.
+	constructor(source, frames, w, h) {
+		super(source, frames, 0, 0, 1, 1);
+
+		// Store the dimensions of a jump.
+		this._jw = w;
+		this._jh = h;
+	}
+
+	// Reset the jump state on start.
+	async start(game) {
+		game.state.jump_time = -1;
+	}
+
+	// Render the player to the game.
+	async render(game) {
+		// Get the current tile the player is at.
+		let tile = Math.floor(game.elapsed * game.state.speed);
+
+		// Set the frame in the player animation.
+		this.frame = tile % 4;
+
+		// Set the player position to its default.
+		this.y = game.h - 2;
+
+		// If a jump is in progress.
+		if (game.state.jump_time >= 0) {
+			// Get the distance travelled in the jump.
+			let jump_distance = (game.elapsed - game.state.jump_time) * game.state.speed;
+			// Get the vertical offset for the current distance into the jump.
+			let jump_offset = this._jh * (1 - Math.pow(2 * jump_distance / this._jw - 1, 2));
+
+			// If the jump distance has exceeded the width of a jump.
+			if (jump_distance >= this._jw) {
+				// Clear the jump start time.
+				game.state.jump_time = -1;
+			} else {
+				// Otherwise add the jump vertical offset to the player position.
+				this.y -= jump_offset;
+			}
+		}
+
+		// Render the character.
+		await super.render(game);
+	}
+
+	// Start a jump when pressed.
+	async press(game, x, y) {
+		// If a jump is not in progress already.
+		if (game.state.jump_time < 0) {
+			// Set the jump start time.
+			game.state.jump_time = game.elapsed;
+		}
+	}
+}
+
 class BasicLevel extends View {
 	constructor(config) {
 		super();
-
-		// Create the player sprite.
-		this._player = new SpriteView(config.images.player.source, 4, 0, 0, 1, 1);
 
 		this._config = config;
 		this._images = {};
 
 		// Calculate the game speed based on the beats per minute.
 		this._speed = this._config.audio.beats_per_minute / 60 / 1000;
+
+		// Create the player view.
+		this._player = new PlayerView(config.images.player.source, frames, JUMP_WIDTH, JUMP_HEIGHT);
 
 		// Calculate the tiles where spikes should occur based on the times.
 		this._map = this._config.map.spike_times.map(time => Math.floor(time * 1000 * this._speed));
@@ -174,13 +232,11 @@ class BasicLevel extends View {
 		// Draw parallax at half speed.
 		for (let index = 0; index <= 1; index++) {
 			game.draw(this._images['parallax'], -distance / 2 % 16 + index * 16, 0);
-			// context.drawImage(this._images['parallax'], (-distance / 2 % 16 + index * 16) * PIXELS_PER_TILE, 0);
 		}
 
 		// Draw ground by rendering 8 tiles shifted by the offset.
 		for (let index = 0; index <= 8; index++) {
 			game.draw(this._images['ground'], index - offset, 3.5);
-			// context.drawImage(this._images['ground'], (index - offset) * PIXELS_PER_TILE, 112);
 		}
 
 		// Iterate over obstacles in the game.
@@ -193,31 +249,11 @@ class BasicLevel extends View {
 			}
 		}
 
-		let jumpOffset = 0;
-
-		// If a jump is occurring.
-		if (this._jump_start) {
-			// Get the distance travelled in the jump.
-			let jumpDistance = distance - this._jump_start;
-
-			if (jumpDistance < JUMP_WIDTH) {
-				// If the jump is not finished, update the player offset.
-				jumpOffset = JUMP_HEIGHT * (1 - Math.pow(2 * jumpDistance / JUMP_WIDTH - 1, 2));
-			} else {
-				// Otherwise end the jump.
-				this._jump_start = undefined;
-			}
-		}
-
-		// Cycle player through 4 animation frames per tile travelled.
-		this._player.frame = Math.floor((distance - tile) * 4 % 4);
-		this._player.y = 2.5 - jumpOffset;
-
-		// Draw the player tile.
+		// Render the player.
 		this._player.render(game);
 
 		// Check for collisions.
-		if (!this._jump_start) {
+		if (game.state.jump_time < 0) {
 			// If not mid-jump, check if the player is in an obstacle.
 			for (let obstacle_tile of this._map) {
 				// If the player is within the spike range, failure has occurred.
@@ -227,12 +263,9 @@ class BasicLevel extends View {
 
 					// Darken the game.
 					game.rect('#00000088', 0, 0, game.w, game.h);
-					// context.fillStyle = '#00000088';
-					// context.fillRect(0, 0, DISPLAY_WIDTH * PIXELS_PER_TILE, DISPLAY_HEIGHT * PIXELS_PER_TILE);
 
 					// Draw the game over screen.
 					game.draw(this._images.retry, 0, 0);
-					// context.drawImage(this._images.retry, 0, 0);
 
 					// Mark when the player lost.
 					this._time_of_loss = new Date().getTime();
@@ -241,9 +274,14 @@ class BasicLevel extends View {
 		}
 	}
 
-	start(game) {
+	async start(game) {
 		this._time_of_loss = null;
 		this._jump_start = undefined;
+
+		game.state.speed = this._speed;
+
+		// Start the player view.
+		await this._player.start(game);
 
 		// Start the music.
 		this._audio.play();
@@ -255,17 +293,20 @@ class BasicLevel extends View {
 		this._audio.currentTime = 0;
 	}
 
-	press(game, x, y) {
+	async press(game, x, y) {
 		// If the player has lost the game.
 		if (this._time_of_loss) {
 			// Wait a second before letting them retry.
 			if (new Date().getTime() - this._time_of_loss > 1000) {
 				this._time_of_loss = null;
-				game.start();
+				await game.start();
 			}
-		} else if (isNaN(this._jump_start)) {
+		} else {
 			// If the player is not mid-jump, set the current poisition as the jump start point.
 			this._jump_start = game.elapsed * this._speed;
+
+			// Send the press event to the player view.
+			await this._player.press(game, x, y);
 		}
 	}
 }

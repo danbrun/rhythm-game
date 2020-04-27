@@ -72,7 +72,6 @@ const JUMP_WIDTH = 1.8;
 class TitleScreen extends ImageView {
 	constructor() {
 		super('./assets/images/Title_Screen.png', 0, 0);
-
 		this._border = new BorderView();
 	}
 
@@ -81,8 +80,7 @@ class TitleScreen extends ImageView {
 	}
 
 	async render(game) {
-		super.render(game);
-
+		await super.render(game);
 		await this._border.render(game);
 	}
 
@@ -95,6 +93,12 @@ class TitleScreen extends ImageView {
 class LevelSelect extends ImageView {
 	constructor() {
 		super('./assets/images/level_select.png', 0, 0);
+		this._border = new BorderView();
+	}
+
+	async render(game) {
+		await super.render(game);
+		await this._border.render(game);
 	}
 
 	async press(game, x, y) {
@@ -173,6 +177,8 @@ class BasicLevel extends View {
 	constructor(config) {
 		super();
 
+		this._border = new BorderView();
+
 		this._config = config;
 		this._images = {};
 
@@ -195,7 +201,7 @@ class BasicLevel extends View {
 	}
 
 	async load() {
-		let promises = [this._player.load()];
+		let promises = [this._player.load(), this._border.load()];
 
 		// Load the audio file.
 		promises.push(loadAudio(this._config.audio.source).then(audio => this._audio = audio))
@@ -250,7 +256,7 @@ class BasicLevel extends View {
 		}
 
 		// Render the player.
-		this._player.render(game);
+		await this._player.render(game);
 
 		// Check for collisions.
 		if (game.state.jump_time < 0) {
@@ -272,6 +278,8 @@ class BasicLevel extends View {
 				}
 			}
 		}
+
+		await this._border.render(game);
 	}
 
 	async start(game) {

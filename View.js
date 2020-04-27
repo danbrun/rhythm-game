@@ -38,7 +38,7 @@ class ImageView extends View {
 
 	// Load the image from the URL asynchronously.
 	async load(game) {
-		return new Promise((resolve, reject) => {
+		await new Promise((resolve, reject) => {
 			// Create the image instance.
 			let image = new Image(this._source);
 
@@ -91,4 +91,47 @@ class SpriteView extends ImageView {
 	}
 }
 
-export { View, ImageView, SpriteView };
+class BorderView extends View {
+	constructor() {
+		super();
+
+		this._top = new ImageView('./assets/images/top_tiled.png', 0, 0);
+		this._left = new ImageView('./assets/images/left_tiled.png', 0, 0);
+		this._right = new ImageView('./assets/images/right_tiled.png', 0, 0);
+		this._bottom = new ImageView('./assets/images/bottom_tiled.png', 0, 0);
+	}
+
+	async load() {
+		await Promise.all([
+			this._top.load(),
+			this._left.load(),
+			this._right.load(),
+			this._bottom.load(),
+		]);
+	}
+
+	async render(game) {
+		let transform = game.transform;
+		let tile_size = game.tile_size;
+
+		// Render the left and right borders.
+		for (var x = 0; x < (transform[4] / transform[0]) / tile_size; x++) {
+			this._left.x = -(x + 1);
+			this._right.x = game.w + x;
+
+			await this._left.render(game);
+			await this._right.render(game);
+		}
+
+		// Render the top and bottom borders.
+		for (var y = 0; y < (transform[5] / transform[3]) / tile_size; y++) {
+			this._top.y = -(y + 1);
+			this._bottom.y = game.h + y;
+
+			await this._top.render(game);
+			await this._bottom.render(game);
+		}
+	}
+}
+
+export { View, ImageView, SpriteView, BorderView };

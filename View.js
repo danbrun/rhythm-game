@@ -3,8 +3,54 @@ class View {
 	// Views can load assets.
 	async load() { }
 
+	// Views can start using a game.
+	async start(game) { }
+
 	// Views can render assets into a Game.
 	async render(game) { }
+
+	// Views can receive a press event.
+	async press(game, x, y) { }
+}
+
+// View class that runs a series of child views.
+class MultiView extends View {
+	// Create a multi view using a list of child views.
+	constructor(views) {
+		super();
+
+		this._children = views;
+	}
+
+	// Load the child views.
+	async load() {
+		// Start loading all at once and wait for all to finish.
+		await Promise.all(this._children.map(child => child.load()));
+	}
+
+	// Start each of the child views.
+	async start(game) {
+		// Start each child in order of appearance.
+		for (let child of this._children) {
+			await child.start(game);
+		}
+	}
+
+	// Render the child views.
+	async render(game) {
+		// Render each child in order and wait before rendering the next.
+		for (let child of this._children) {
+			await child.render(game);
+		}
+	}
+
+	// Forward press to each child view.
+	async press(game, x, y) {
+		// Press each child in order and wait before pressing the next.
+		for (let child of this._children) {
+			await child.press(game, x, y);
+		}
+	}
 }
 
 // Basic View class for displaying a single static image.
@@ -91,47 +137,41 @@ class SpriteView extends ImageView {
 	}
 }
 
-class BorderView extends View {
+// View for rendering the frame around the game area.
+class BorderView extends MultiView {
+	// Create the top, left, right, and bottom image views and construct the underlying MultiView.
 	constructor() {
-		super();
-
-		this._top = new ImageView('./assets/images/top_tiled.png', 0, 0);
-		this._left = new ImageView('./assets/images/left_tiled.png', 0, 0);
-		this._right = new ImageView('./assets/images/right_tiled.png', 0, 0);
-		this._bottom = new ImageView('./assets/images/bottom_tiled.png', 0, 0);
-	}
-
-	async load() {
-		await Promise.all([
-			this._top.load(),
-			this._left.load(),
-			this._right.load(),
-			this._bottom.load(),
+		super([
+			new ImageView('./assets/images/top_tiled.png', 0, 0),
+			new ImageView('./assets/images/left_tiled.png', 0, 0),
+			new ImageView('./assets/images/right_tiled.png', 0, 0),
+			new ImageView('./assets/images/bottom_tiled.png', 0, 0),
 		]);
 	}
 
+	// Override the MultiView rendering function to move the borders into the proper locations.
 	async render(game) {
 		let transform = game.transform;
 		let tile_size = game.tile_size;
 
 		// Render the left and right borders.
 		for (var x = 0; x < (transform[4] / transform[0]) / tile_size; x++) {
-			this._left.x = -(x + 1);
-			this._right.x = game.w + x;
+			this._children[1].x = -(x + 1);
+			this._children[2].x = game.w + x;
 
-			await this._left.render(game);
-			await this._right.render(game);
+			await this._children[1].render(game);
+			await this._children[2].render(game);
 		}
 
 		// Render the top and bottom borders.
 		for (var y = 0; y < (transform[5] / transform[3]) / tile_size; y++) {
-			this._top.y = -(y + 1);
-			this._bottom.y = game.h + y;
+			this._children[0].y = -(y + 1);
+			this._children[3].y = game.h + y;
 
-			await this._top.render(game);
-			await this._bottom.render(game);
+			await this._children[0].render(game);
+			await this._children[3].render(game);
 		}
 	}
 }
 
-export { View, ImageView, SpriteView, BorderView };
+export { View, MultiView, ImageView, SpriteView, BorderView };

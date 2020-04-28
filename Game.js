@@ -220,11 +220,15 @@ class Game {
 		this._context.drawImage(image, ...args.map(arg => arg * this._tile_size));
 	}
 
+	// Get a gradient fill style from the canvas.
 	gradient(...args) {
+		// Return the gradient with the tile units converted to pixels.
 		return this._context.createLinearGradient(...args.map(arg => arg * this._tile_size));
 	}
 
+	// Fill a rectangle on the game canvas.
 	rect(style, ...args) {
+		// Fill the canvas in pixels instead of tiles.
 		this._context.fillStyle = style;
 		this._context.fillRect(...args.map(arg => arg * this._tile_size));
 	}

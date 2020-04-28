@@ -1,24 +1,7 @@
 import { Game } from './Game.js';
-import { View, ImageView, SpriteView, BorderView } from './View.js';
+import { View, MultiView, ImageView, SpriteView, BorderView } from './View.js';
 
 let levels = [];
-
-// Load an image asynchrnously.
-async function loadImage(url) {
-	return new Promise((resolve, reject) => {
-		let image = new Image();
-
-		image.addEventListener('load', function () {
-			resolve(image);
-		});
-
-		image.addEventListener('error', function (event) {
-			reject(event);
-		});
-
-		image.src = url;
-	});
-}
 
 // Load audio asynchronously.
 async function loadAudio(url) {
@@ -69,19 +52,12 @@ const SPEED = BEATS_PER_MINUTE * TILES_PER_BEAT / 60 / 1000;
 const JUMP_HEIGHT = 1;
 const JUMP_WIDTH = 1.8;
 
-class TitleScreen extends ImageView {
+class TitleScreen extends MultiView {
 	constructor() {
-		super('./assets/images/Title_Screen.png', 0, 0);
-		this._border = new BorderView();
-	}
-
-	async load() {
-		await Promise.all([super.load(), this._border.load()]);
-	}
-
-	async render(game) {
-		await super.render(game);
-		await this._border.render(game);
+		super([
+			new ImageView('./assets/images/Title_Screen.png', 0, 0),
+			new BorderView(),
+		]);
 	}
 
 	async press(game, x, y) {
@@ -90,15 +66,12 @@ class TitleScreen extends ImageView {
 	}
 }
 
-class LevelSelect extends ImageView {
+class LevelSelect extends MultiView {
 	constructor() {
-		super('./assets/images/level_select.png', 0, 0);
-		this._border = new BorderView();
-	}
-
-	async render(game) {
-		await super.render(game);
-		await this._border.render(game);
+		super([
+			new ImageView('./assets/images/level_select.png', 0, 0),
+			new BorderView(),
+		]);
 	}
 
 	async press(game, x, y) {
@@ -111,6 +84,91 @@ class LevelSelect extends ImageView {
 		} else if (new Box(5, 1.5, 2, 1.5).contains(x, y)) {
 			// Level 3 pressed.
 			await game.view(levels[2]);
+		}
+	}
+}
+
+class GameOverView extends ImageView {
+	constructor() {
+		super('./assets/images/gameover.png', 0, 0);
+	}
+
+	async render(game) {
+		// Only render if the game is over.
+		if (game.state.game_over) {
+			game.rect('#00000088', 0, 0, game.w, game.h);
+			await super.render(game);
+		}
+	}
+
+	async press(game) {
+		// If the game is over and a quarter of a second has passed since it ended.
+		if (game.state.game_over && game.elapsed - game.state.game_over_time > 250) {
+			await game.start();
+		}
+	}
+}
+
+class BackgroundView extends ImageView {
+	constructor(top_color, bottom_color, parallax_source) {
+		super(parallax_source, 0, 0);
+
+		this._top_color = top_color;
+		this._bottom_color = bottom_color;
+	}
+
+	async render(game) {
+		let distance = game.elapsed * game.state.speed;
+
+		// Create the background gradient.
+		var gradient = game.gradient(0, 0, 0, game.h);
+		gradient.addColorStop(0, this._top_color);
+		gradient.addColorStop(1, this._bottom_color);
+
+		// Draw the background.
+		game.rect(gradient, 0, 0, game.w, game.h);
+
+		// Draw parallax at half speed.
+		for (let index = 0; index <= 1; index++) {
+			this.x = -distance / 2 % 16 + index * 16;
+
+			await super.render(game);
+		}
+	}
+}
+
+class ForegroundView extends MultiView {
+	constructor(ground_source, spike_source, spike_tiles) {
+		super([
+			new ImageView(ground_source, 0, 0),
+			new ImageView(spike_source, 0, 0),
+		]);
+
+		this._spike_tiles = spike_tiles;
+	}
+
+	async render(game) {
+		let distance = game.elapsed * game.state.speed;
+		let tile = Math.floor(distance);
+		let offset = distance - tile;
+
+		// Draw ground by rendering 8 tiles shifted by the offset.
+		for (let index = 0; index <= 8; index++) {
+			this._children[0].x = index - offset;
+			this._children[0].y = game.h - 1;
+
+			await this._children[0].render(game);
+		}
+
+		// Iterate over obstacles in the game.
+		for (let spike_tile of this._spike_tiles) {
+			// If the obstacle is on the screen.
+			if (tile <= spike_tile && spike_tile <= tile + game.w) {
+				this._children[1].x = spike_tile - tile - offset;
+				this._children[1].y = game.h - 2;
+
+				await this._children[1].render(game);
+			}
 		}
 	}
 }
@@ -165,31 +223,38 @@ class PlayerView extends SpriteView {
 
 	// Start a jump when pressed.
 	async press(game, x, y) {
-		// If a jump is not in progress already.
-		if (game.state.jump_time < 0) {
+		// If the game is running and a jump is not in progress already.
+		if (!game.state.game_over && game.state.jump_time < 0) {
 			// Set the jump start time.
 			game.state.jump_time = game.elapsed;
 		}
 	}
 }
 
-class BasicLevel extends View {
+class BasicLevel extends MultiView {
 	constructor(config) {
-		super();
-
-		this._border = new BorderView();
-
-		this._config = config;
-		this._images = {};
-
 		// Calculate the game speed based on the beats per minute.
-		this._speed = this._config.audio.beats_per_minute / 60 / 1000;
-
-		// Create the player view.
-		this._player = new PlayerView(config.images.player.source, frames, JUMP_WIDTH, JUMP_HEIGHT);
+		let speed = config.audio.beats_per_minute / 60 / 1000;
 
 		// Calculate the tiles where spikes should occur based on the times.
-		this._map = this._config.map.spike_times.map(time => Math.floor(time * 1000 * this._speed));
+		let map = config.map.spike_times.map(time => Math.floor(time * 1000 * speed));
+
+		super([
+			new BackgroundView(
+				config.images.background.start,
+				config.images.background.stop,
+				config.images.parallax.source
+			),
+			new ForegroundView(config.images.ground.source, config.images.spikes.source, map),
+			new PlayerView(config.images.player.source, frames, JUMP_WIDTH, JUMP_HEIGHT),
+			new GameOverView(),
+			new BorderView(),
+		]);
+
+		this._config = config;
+		this._map = map;
+		this._speed = speed;
+		this._images = {};
 	}
 
 	static async import(name) {
@@ -201,19 +266,10 @@ class BasicLevel extends View {
 	}
 
 	async load() {
-		let promises = [this._player.load(), this._border.load()];
-
-		// Load the audio file.
-		promises.push(loadAudio(this._config.audio.source).then(audio => this._audio = audio))
-
-		// Load all of the image files.
-		for (let [name, data] of Object.entries(this._config.images)) {
-			if (data.source) {
-				promises.push(loadImage(data.source).then(image => this._images[name] = image));
-			}
-		}
-
-		await Promise.all(promises)
+		await Promise.all([
+			loadAudio(this._config.audio.source).then(audio => this._audio = audio),
+			super.load(),
+		]);
 	}
 
 	async render(game) {
@@ -225,38 +281,9 @@ class BasicLevel extends View {
 		// Get the distance travelled and in tiles and remainder.
 		let distance = game.elapsed * this._speed;
 		let tile = Math.floor(distance);
-		let offset = distance - tile;
 
-		// Create the background gradient.
-		var gradient = game.gradient(0, 0, 0, game.h);
-		gradient.addColorStop(0, this._config.images.background.start);
-		gradient.addColorStop(1, this._config.images.background.stop);
-
-		// Draw the background.
-		game.rect(gradient, 0, 0, game.w, game.h);
-
-		// Draw parallax at half speed.
-		for (let index = 0; index <= 1; index++) {
-			game.draw(this._images['parallax'], -distance / 2 % 16 + index * 16, 0);
-		}
-
-		// Draw ground by rendering 8 tiles shifted by the offset.
-		for (let index = 0; index <= 8; index++) {
-			game.draw(this._images['ground'], index - offset, 3.5);
-		}
-
-		// Iterate over obstacles in the game.
-		for (let obstacle_tile of this._map) {
-			// If the obstacle is on the screen.
-			if (tile <= obstacle_tile && obstacle_tile <= tile + DISPLAY_WIDTH) {
-				// Draw the obstacle.
-				game.draw(this._images['spikes'], obstacle_tile - tile - offset, 2.5);
-				// context.drawImage(this._images['spikes'], (obstacle_tile - tile - offset) * PIXELS_PER_TILE, 2.5 * PIXELS_PER_TILE);
-			}
-		}
-
-		// Render the player.
-		await this._player.render(game);
+		// Render the child views.
+		await super.render(game);
 
 		// Check for collisions.
 		if (game.state.jump_time < 0) {
@@ -265,31 +292,20 @@ class BasicLevel extends View {
 				// If the player is within the spike range, failure has occurred.
 				if (obstacle_tile - 0.75 <= distance && distance <= obstacle_tile + 0.75) {
 					// Stop the game.
-					game.stop();
+					game.state.game_over = true;
+					game.state.game_over_time = game.elapsed;
 
-					// Darken the game.
-					game.rect('#00000088', 0, 0, game.w, game.h);
-
-					// Draw the game over screen.
-					game.draw(this._images.retry, 0, 0);
-
-					// Mark when the player lost.
-					this._time_of_loss = new Date().getTime();
+					// Pause the music.
+					this._audio.pause();
 				}
 			}
 		}
-
-		await this._border.render(game);
 	}
 
 	async start(game) {
-		this._time_of_loss = null;
-		this._jump_start = undefined;
-
 		game.state.speed = this._speed;
 
-		// Start the player view.
-		await this._player.start(game);
+		await super.start(game);
 
 		// Start the music.
 		this._audio.play();
@@ -299,23 +315,6 @@ class BasicLevel extends View {
 		// Stop the music.
 		this._audio.pause();
 		this._audio.currentTime = 0;
-	}
-
-	async press(game, x, y) {
-		// If the player has lost the game.
-		if (this._time_of_loss) {
-			// Wait a second before letting them retry.
-			if (new Date().getTime() - this._time_of_loss > 1000) {
-				this._time_of_loss = null;
-				await game.start();
-			}
-		} else {
-			// If the player is not mid-jump, set the current poisition as the jump start point.
-			this._jump_start = game.elapsed * this._speed;
-
-			// Send the press event to the player view.
-			await this._player.press(game, x, y);
-		}
 	}
 }
 

@@ -10,11 +10,6 @@ class View {
 			await this[name](game, data);
 		}
 	}
-
-	// Forward events downstream to child views.
-	async forward(name, game, data) {
-		// Do nothing because this view does not contain children.
-	}
 }
 
 // View class that runs a series of child views.
@@ -40,12 +35,16 @@ class MultiView extends View {
 
 	// Trigger events to multiple views.
 	async trigger(name, game, data) {
-		if (name in this) {
-			// If there is an event handler, call it.
-			await this[name](game, data);
-		} else {
-			// Otherwise forward the event.
-			await this.forward(name, game, data);
+		switch (name in this) {
+			case true:
+				// If there is an event handler, call it.
+				let cancel = await this[name](game, data);
+
+				// If the event returned true, cancel propagation by breaking the switch.
+				if (cancel) { break; }
+			case false:
+				// Otherwise forward the event.
+				await this.forward(name, game, data);
 		}
 	}
 
@@ -176,6 +175,9 @@ class BorderView extends MultiView {
 			await this._views[0].trigger('render', game, data);
 			await this._views[3].trigger('render', game, data);
 		}
+
+		// Cancel propagation.
+		return true;
 	}
 }
 

@@ -3,27 +3,27 @@
 		"beats_per_minute": 120,
 		"source": "assets/audio/Level 1 Alternate.wav"
 	},
-	"images": {
-		"background": {
-			"type": "gradient",
-			"start": "#2efe92",
-			"stop": "#42407a"
+	"background": {
+		"top": "#2efe92",
+		"bottom": "#42407a"
+	},
+	"parallax": {
+		"source": "assets/images/Parallax1.png"
+	},
+	"ground": {
+		"source": "assets/images/Base_Tile_Square.png"
+	},
+	"spikes": {
+		"source": "assets/images/Spike_Tile_Square.png"
+	},
+	"player": {
+		"jump": {
+			"width": 1.8,
+			"height": 1,
+			"tolerance": 0.7
 		},
-		"parallax": {
-			"source": "assets/images/Parallax1.png"
-		},
-		"ground": {
-			"source": "assets/images/Base_Tile_Square.png"
-		},
-		"spikes": {
-			"source": "assets/images/Spike_Tile_Square.png"
-		},
-		"player": {
-			"source": "assets/images/Player_Idle_Square-Sheet.png"
-		},
-		"retry": {
-			"source": "assets/images/gameover.png"
-		}
+		"frames": 4,
+		"source": "assets/images/Player_Idle_Square-Sheet.png"
 	},
 	"map": {
 		"spike_times": [

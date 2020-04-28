@@ -6,8 +6,8 @@ class Game {
 		this._context = canvas.getContext('2d');
 
 		// Bind input hanlers to canvas events.
-		this._canvas.addEventListener('mousedown', event => this.mousedown(event));
-		this._canvas.addEventListener('touchstart', event => this.touchstart(event));
+		this._canvas.addEventListener('mousedown', event => this._mousedown(event));
+		this._canvas.addEventListener('touchstart', event => this._touchstart(event));
 
 		// Store the width and height in tiles and the number of pixels per tile.
 		this._w = w;
@@ -22,7 +22,8 @@ class Game {
 		this._request = null;
 		this._frame = null;
 
-		// Store active view.
+		// Store view registry and active view.
+		this._views = {};
 		this._view = null;
 
 		// Unset press flag.
@@ -168,24 +169,15 @@ class Game {
 		}
 	}
 
-	// Mouse click event handler.
-	async mousedown(event) {
-		// Call the press handler with the localized coordinates.
-		await this.press(...this._localize(event.clientX, event.clientY));
+	// Register a new view in the game.
+	async register(data) {
+		this._views[data.name] = data.view;
 	}
 
-	// Touch screen event handler.
-	async touchstart(event) {
-		// Cancel the mouse event and get touch location.
-		event.preventDefault();
-		let touch = event.touches[0];
+	// Change to a registered view.
+	async view(data) {
+		let view = this._views[data.name];
 
-		// Call the press handler with the localized coordinates.
-		await this.press(...this._localize(touch.clientX, touch.clientY));
-	}
-
-	// Change to a new view.
-	async view(view) {
 		// Wait for the current view to stop and the new view to load.
 		await Promise.all([this.stop(), view.load()]);
 
@@ -193,7 +185,23 @@ class Game {
 		this._view = view;
 
 		// Start the new view.
-		await this.start();
+		await this.trigger('start', {});
+	}
+
+	// Mouse click raw event handler.
+	_mousedown(event) {
+		// Call the press handler with the localized coordinates.
+		this.press(...this._localize(event.clientX, event.clientY));
+	}
+
+	// Touch screen raw event handler.
+	_touchstart(event) {
+		// Cancel the mouse event and get touch location.
+		event.preventDefault();
+		let touch = event.touches[0];
+
+		// Call the press handler with the localized coordinates.
+		this.press(...this._localize(touch.clientX, touch.clientY));
 	}
 
 	// Converts screen pixel coordinates to tile positions.

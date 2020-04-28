@@ -1,7 +1,7 @@
 {
 	"audio": {
 		"beats_per_minute": 120,
-		"source": "assets/audio/MV Final Project 2_28_V2.wav"
+		"source": "assets/audio/Level 1 Alternate.wav"
 	},
 	"images": {
 		"background": {
@@ -27,7 +27,6 @@
 	},
 	"map": {
 		"spike_times": [
-			1,
 			3,
 			5,
 			7,

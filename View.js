@@ -3,52 +3,57 @@ class View {
 	// Views can load assets.
 	async load() { }
 
-	// Views can start using a game.
-	async start(game) { }
+	// Trigger event behavior using member functions.
+	async trigger(name, game, data) {
+		if (name in this) {
+			// If we have a handler method, call it.
+			await this[name](game, data);
+		}
+	}
 
-	// Views can render assets into a Game.
-	async render(game) { }
-
-	// Views can receive a press event.
-	async press(game, x, y) { }
+	// Forward events downstream to child views.
+	async forward(name, game, data) {
+		// Do nothing because this view does not contain children.
+	}
 }
 
 // View class that runs a series of child views.
 class MultiView extends View {
-	// Create a multi view using a list of child views.
+	// Create a multiview with an optional list of child views.
 	constructor(views) {
 		super();
 
-		this._children = views;
+		// Initialize to an empty list if not given views.
+		this._views = views || [];
+	}
+
+	// Access the view list.
+	get views() {
+		return this._views;
 	}
 
 	// Load the child views.
 	async load() {
 		// Start loading all at once and wait for all to finish.
-		await Promise.all(this._children.map(child => child.load()));
+		await Promise.all(this._views.map(child => child.load()));
 	}
 
-	// Start each of the child views.
-	async start(game) {
-		// Start each child in order of appearance.
-		for (let child of this._children) {
-			await child.start(game);
+	// Trigger events to multiple views.
+	async trigger(name, game, data) {
+		if (name in this) {
+			// If there is an event handler, call it.
+			await this[name](game, data);
+		} else {
+			// Otherwise forward the event.
+			await this.forward(name, game, data);
 		}
 	}
 
-	// Render the child views.
-	async render(game) {
-		// Render each child in order and wait before rendering the next.
-		for (let child of this._children) {
-			await child.render(game);
-		}
-	}
-
-	// Forward press to each child view.
-	async press(game, x, y) {
-		// Press each child in order and wait before pressing the next.
-		for (let child of this._children) {
-			await child.press(game, x, y);
+	// Forward events downstream to child views.
+	async forward(name, game, data) {
+		// Call the handler for each child view.
+		for (let view of this._views) {
+			await view.trigger(name, game, data);
 		}
 	}
 }
@@ -99,7 +104,7 @@ class ImageView extends View {
 	}
 
 	// Render the image onto the Game class.
-	async render(game) {
+	async render(game, data) {
 		// Check that the image is already loaded first.
 		if (this._image) {
 			if (this._w && this._h) {
@@ -128,7 +133,7 @@ class SpriteView extends ImageView {
 	set frame(value) { this._frame = value; }
 
 	// Render the sprite onto the Game class.
-	async render(game) {
+	async render(game, data) {
 		// Check that the image is already loaded first.
 		if (this._image) {
 			// Draw the current frame of the sprite into the specified position.
@@ -150,26 +155,26 @@ class BorderView extends MultiView {
 	}
 
 	// Override the MultiView rendering function to move the borders into the proper locations.
-	async render(game) {
-		let transform = game.transform;
-		let tile_size = game.tile_size;
+	async render(game, data) {
+		let transform = data.transform;
+		let tile_size = data.tile_size;
 
 		// Render the left and right borders.
 		for (var x = 0; x < (transform[4] / transform[0]) / tile_size; x++) {
-			this._children[1].x = -(x + 1);
-			this._children[2].x = game.w + x;
+			this._views[1].x = -(x + 1);
+			this._views[2].x = data.width + x;
 
-			await this._children[1].render(game);
-			await this._children[2].render(game);
+			await this._views[1].trigger('render', game, data);
+			await this._views[2].trigger('render', game, data);
 		}
 
 		// Render the top and bottom borders.
 		for (var y = 0; y < (transform[5] / transform[3]) / tile_size; y++) {
-			this._children[0].y = -(y + 1);
-			this._children[3].y = game.h + y;
+			this._views[0].y = -(y + 1);
+			this._views[3].y = data.height + y;
 
-			await this._children[0].render(game);
-			await this._children[3].render(game);
+			await this._views[0].trigger('render', game, data);
+			await this._views[3].trigger('render', game, data);
 		}
 	}
 }

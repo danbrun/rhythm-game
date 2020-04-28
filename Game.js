@@ -22,30 +22,21 @@ class Game {
 		this._request = null;
 		this._frame = null;
 
-		// Store view-level state information.
-		this._state = {};
+		// Store active view.
+		this._view = null;
 
 		// Unset press flag.
 		this._pressing = false;
-	}
-
-	// Get the time elapsed since the game started.
-	get elapsed() {
-		return new Date().getTime() - this._start_time;
 	}
 
 	get w() { return this._w; }
 	get h() { return this._h; }
 	get tile_size() { return this._tile_size; }
 
-	// Access the screen size of the game in pixels.
-	get sw() { return this._canvas.width; }
-	get sh() { return this._canvas.height; }
-
-	// Get the last transformation applied to the canvas.
-	get transform() { return this._transform; }
-
-	get state() { return this._state; }
+	// Get the time since the game was started.
+	get _time() {
+		return new Date().getTime() - this._start_time;
+	}
 
 	// Calculate the transformation needed to make the game fit the canvas.
 	get _transform() {
@@ -80,18 +71,27 @@ class Game {
 		}
 	}
 
-	// Start rendering the game.
-	async start() {
-		// Wait for the view to load.
-		await this._view.load();
-
-		// Clear the game state.
-		this._state = {};
-
-		// If the view has a start handler, call it.
-		if (this._view.start) {
-			this._view.start(this);
+	// Trigger an event in the game with the name and data.
+	async trigger(name, data) {
+		if (name in this) {
+			// If we have a handler, call it.
+			await this[name](data);
+		} else {
+			// Forward the event downstream.
+			await this.forward(name, data);
 		}
+	}
+
+	// Forward an event to game view with the name and data.
+	async forward(name, data) {
+		// Trigger the view with the event data.
+		await this._view.trigger(name, this, data);
+	}
+
+	// Start rendering the game.
+	async start(data) {
+		// Forward the start event to the view.
+		await this.forward('start', data);
 
 		// Set the running flag and start time.
 		this._running = true;
@@ -102,60 +102,68 @@ class Game {
 	}
 
 	// Stop rendering the game and wait for the current frame to finish.
-	async stop() {
-		if (!this._view) {
-			return;
-		}
+	async stop(data) {
+		// If there is a view being rendered.
+		if (this._view) {
+			// Forward the stop event to the view.
+			await this.forward('stop', data);
 
-		// If the view has a stop handler, call it.
-		if (this._view.stop) {
-			this._view.stop(this);
-		}
+			// Unset the running flag and start time.
+			this._running = false;
+			this._start_time = null;
 
-		// Unset the running flag and start time.
-		this._running = false;
-		this._start_time = null;
+			// If there is a request for another frame.
+			if (this._request) {
+				// Cancel the request.
+				cancelAnimationFrame(this._request);
+				this._request = null;
+			}
 
-		// If there is a request for another frame.
-		if (this._request) {
-			// Cancel the request.
-			cancelAnimationFrame(this._request);
-			this._request = null;
-		}
-
-		// If there is a frame in progress.
-		if (this._frame) {
-			// Wait for it to finish.
-			await this._frame;
-			this._frame = null;
+			// If there is a frame in progress.
+			if (this._frame) {
+				// Wait for it to finish.
+				await this._frame;
+				this._frame = null;
+			}
 		}
 	}
 
-	// Converts screen pixel coordinates to tile positions.
-	localize(x, y) {
-		// Calculate the transformation on the view.
-		let transform = this.transform;
+	// Render a single frame from the current view in the game.
+	async render() {
+		// Save the state of the canvas context.
+		this._context.save();
 
-		// Convert the x and y coordinates to tile positions.
-		x = (x - transform[4]) / (transform[0] * this._tile_size);
-		y = (y - transform[5]) / (transform[3] * this._tile_size);
+		// Adjust canvas to upscale game to fit screen without smoothing.
+		this._context.imageSmoothingEnabled = false;
+		this._context.transform(...this._transform);
 
-		return [x, y];
+		// Render the current view.
+		await this.forward('render', {
+			width: this.w,
+			height: this.h,
+			transform: this._transform,
+			tile_size: this._tile_size,
+			time: this._time,
+		});
+
+		// Restore the saved state of the canvas context.
+		this._context.restore();
+
+		// If the game is still running, request the next frame.
+		if (this._running) {
+			this._request = requestAnimationFrame(() => this._frame = this.render());
+		}
 	}
 
 	// Send a press event to the view given tile coordinates.
 	async press(x, y) {
 		// If a press is not already being handled.
 		if (this._pressing == false) {
-			// Set the pressing flag.
 			this._pressing = true;
 
 			// If the view has a press handler, call it.
-			if (this._view.press) {
-				await this._view.press(this, x, y);
-			}
+			await this.forward('press', { x: x, y: y, time: this._time });
 
-			// Unset the pressing flag.
 			this._pressing = false;
 		}
 	}
@@ -163,19 +171,17 @@ class Game {
 	// Mouse click event handler.
 	async mousedown(event) {
 		// Call the press handler with the localized coordinates.
-		await this.press(...this.localize(event.clientX, event.clientY));
+		await this.press(...this._localize(event.clientX, event.clientY));
 	}
 
 	// Touch screen event handler.
 	async touchstart(event) {
-		// Cancel the mouse event.
+		// Cancel the mouse event and get touch location.
 		event.preventDefault();
-
-		// Get the first touch location.
 		let touch = event.touches[0];
 
 		// Call the press handler with the localized coordinates.
-		await this.press(...this.localize(touch.clientX, touch.clientY));
+		await this.press(...this._localize(touch.clientX, touch.clientY));
 	}
 
 	// Change to a new view.
@@ -190,28 +196,16 @@ class Game {
 		await this.start();
 	}
 
-	// Render a single frame from the current view in the game.
-	async render() {
-		// Save the state of the canvas context.
-		this._context.save();
+	// Converts screen pixel coordinates to tile positions.
+	_localize(x, y) {
+		// Calculate the transformation on the view.
+		let transform = this._transform;
 
-		// Disable smoothing on upscaled images.
-		this._context.imageSmoothingEnabled = false;
+		// Convert the x and y coordinates to tile positions.
+		x = (x - transform[4]) / (transform[0] * this._tile_size);
+		y = (y - transform[5]) / (transform[3] * this._tile_size);
 
-		// Apply the canvas transformation to make the game fit the screen.
-		this._context.transform(...this._transform);
-
-		// Render the current view.
-		await this._view.render(this);
-
-		// Restore the saved state of the canvas context.
-		this._context.restore();
-
-		// If the game is still running.
-		if (this._running) {
-			// Create a request for the next frame.
-			this._request = requestAnimationFrame(() => this._frame = this.render());
-		}
+		return [x, y];
 	}
 
 	// Draw an image onto the game canvas.

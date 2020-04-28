@@ -74,14 +74,14 @@ class LevelSelect extends MultiView {
 		]);
 	}
 
-	async press(game, x, y) {
-		if (new Box(1, 1.5, 2, 1.5).contains(x, y)) {
+	async press(game, data) {
+		if (new Box(1, 1.5, 2, 1.5).contains(data.x, data.y)) {
 			// Level 1 pressed.
 			await game.view(levels[0]);
-		} else if (new Box(3, 1.5, 2, 1.5).contains(x, y)) {
+		} else if (new Box(3, 1.5, 2, 1.5).contains(data.x, data.y)) {
 			// Level 2 pressed.
 			await game.view(levels[1]);
-		} else if (new Box(5, 1.5, 2, 1.5).contains(x, y)) {
+		} else if (new Box(5, 1.5, 2, 1.5).contains(data.x, data.y)) {
 			// Level 3 pressed.
 			await game.view(levels[2]);
 		}
@@ -89,23 +89,40 @@ class LevelSelect extends MultiView {
 }
 
 class GameOverView extends ImageView {
-	constructor() {
+	constructor(fadeout, darkness) {
 		super('./assets/images/gameover.png', 0, 0);
+
+		this._fadeout = fadeout;
+		this._darkness = darkness;
 	}
 
-	async render(game) {
+	async start(game, data) {
+		this._game_over = false;
+		this._game_over_time = -1;
+	}
+
+	async render(game, data) {
+
 		// Only render if the game is over.
-		if (game.state.game_over) {
-			game.rect('#00000088', 0, 0, game.w, game.h);
+		if (this._game_over) {
+			let elapsed = data.time - this._game_over_time;
+			let alpha = Math.min(elapsed * this._darkness / this._fadeout, this._darkness);
+
+			game.rect(`rgba(0, 0, 0, ${alpha})`, 0, 0, game.w, game.h);
 			await super.render(game);
 		}
 	}
 
-	async press(game) {
+	async press(game, data) {
 		// If the game is over and a quarter of a second has passed since it ended.
-		if (game.state.game_over && game.elapsed - game.state.game_over_time > 250) {
+		if (this._game_over && data.time - this._game_over_time > 250) {
 			await game.start();
 		}
+	}
+
+	async lose(game, data) {
+		this._game_over = true;
+		this._game_over_time = data.time;
 	}
 }
 
@@ -117,22 +134,20 @@ class BackgroundView extends ImageView {
 		this._bottom_color = bottom_color;
 	}
 
-	async render(game) {
-		let distance = game.elapsed * game.state.speed;
-
+	async render(game, data) {
 		// Create the background gradient.
-		var gradient = game.gradient(0, 0, 0, game.h);
+		var gradient = game.gradient(0, 0, 0, data.height);
 		gradient.addColorStop(0, this._top_color);
 		gradient.addColorStop(1, this._bottom_color);
 
 		// Draw the background.
-		game.rect(gradient, 0, 0, game.w, game.h);
+		game.rect(gradient, 0, 0, data.width, data.height);
 
 		// Draw parallax at half speed.
 		for (let index = 0; index <= 1; index++) {
-			this.x = -distance / 2 % 16 + index * 16;
+			this.x = -(data.distance / 2) % 16 + (index * 16);
 
-			await super.render(game);
+			await super.render(game, data);
 		}
 	}
 }
@@ -147,27 +162,27 @@ class ForegroundView extends MultiView {
 		this._spike_tiles = spike_tiles;
 	}
 
-	async render(game) {
-		let distance = game.elapsed * game.state.speed;
-		let tile = Math.floor(distance);
-		let offset = distance - tile;
+	async start(game, data) {
+		this._jump_time = -1;
+	}
 
+	async render(game, data) {
 		// Draw ground by rendering 8 tiles shifted by the offset.
 		for (let index = 0; index <= 8; index++) {
-			this._children[0].x = index - offset;
-			this._children[0].y = game.h - 1;
+			this._views[0].x = index - data.offset;
+			this._views[0].y = data.height - 1;
 
-			await this._children[0].render(game);
+			await this._views[0].trigger('render', game, data);
 		}
 
 		// Iterate over obstacles in the game.
 		for (let spike_tile of this._spike_tiles) {
 			// If the obstacle is on the screen.
-			if (tile <= spike_tile && spike_tile <= tile + game.w) {
-				this._children[1].x = spike_tile - tile - offset;
-				this._children[1].y = game.h - 2;
+			if (data.tile <= spike_tile && spike_tile <= data.tile + game.w) {
+				this._views[1].x = spike_tile - data.tile - data.offset;
+				this._views[1].y = data.height - 2;
 
-				await this._children[1].render(game);
+				await this._views[1].trigger('render', game, data);
 			}
 		}
 	}
@@ -185,32 +200,36 @@ class PlayerView extends SpriteView {
 	}
 
 	// Reset the jump state on start.
-	async start(game) {
-		game.state.jump_time = -1;
+	async start(game, data) {
+		this._jump_time = -1;
+		this._game_over = false;
 	}
 
 	// Render the player to the game.
-	async render(game) {
+	async render(game, data) {
 		// Get the current tile the player is at.
-		let tile = Math.floor(game.elapsed * game.state.speed);
+		let tile = Math.floor(data.time * data.speed);
 
 		// Set the frame in the player animation.
-		this.frame = tile % 4;
+		this.frame = data.tile % 4;
 
 		// Set the player position to its default.
-		this.y = game.h - 2;
+		this.y = data.height - 2;
 
 		// If a jump is in progress.
-		if (game.state.jump_time >= 0) {
+		if (this._jump_time >= 0) {
 			// Get the distance travelled in the jump.
-			let jump_distance = (game.elapsed - game.state.jump_time) * game.state.speed;
+			let jump_distance = (data.time - this._jump_time) * data.speed;
 			// Get the vertical offset for the current distance into the jump.
 			let jump_offset = this._jh * (1 - Math.pow(2 * jump_distance / this._jw - 1, 2));
 
 			// If the jump distance has exceeded the width of a jump.
-			if (jump_distance >= this._jw) {
+			if (jump_distance >= this._jw && !this._game_over) {
 				// Clear the jump start time.
-				game.state.jump_time = -1;
+				this._jump_time = -1;
+
+				// Trigger landing event.
+				game.trigger('land', { time: data.time });
 			} else {
 				// Otherwise add the jump vertical offset to the player position.
 				this.y -= jump_offset;
@@ -222,38 +241,50 @@ class PlayerView extends SpriteView {
 	}
 
 	// Start a jump when pressed.
-	async press(game, x, y) {
+	async press(game, data) {
 		// If the game is running and a jump is not in progress already.
-		if (!game.state.game_over && game.state.jump_time < 0) {
+		if (!this._game_over && this._jump_time < 0) {
 			// Set the jump start time.
-			game.state.jump_time = game.elapsed;
+			this._jump_time = data.time;
+
+			// Trigger jumping event.
+			game.trigger('jump', { time: data.time });
 		}
+	}
+
+	async lose(game, data) {
+		this._jump_time = data.time;
+		this._game_over = true;
 	}
 }
 
 class BasicLevel extends MultiView {
 	constructor(config) {
+		super();
+
 		// Calculate the game speed based on the beats per minute.
-		let speed = config.audio.beats_per_minute / 60 / 1000;
+		this._speed = config.audio.beats_per_minute / 60 / 1000;
 
 		// Calculate the tiles where spikes should occur based on the times.
-		let map = config.map.spike_times.map(time => Math.floor(time * 1000 * speed));
+		this._spike_tiles = config.map.spike_times.map(time => Math.floor(time * 1000 * this._speed));
 
-		super([
+		this._views = [
 			new BackgroundView(
 				config.images.background.start,
 				config.images.background.stop,
 				config.images.parallax.source
 			),
-			new ForegroundView(config.images.ground.source, config.images.spikes.source, map),
+			new ForegroundView(
+				config.images.ground.source,
+				config.images.spikes.source,
+				this._spike_tiles,
+			),
 			new PlayerView(config.images.player.source, frames, JUMP_WIDTH, JUMP_HEIGHT),
-			new GameOverView(),
+			new GameOverView(250, 0.5),
 			new BorderView(),
-		]);
+		];
 
 		this._config = config;
-		this._map = map;
-		this._speed = speed;
 		this._images = {};
 	}
 
@@ -272,49 +303,77 @@ class BasicLevel extends MultiView {
 		]);
 	}
 
-	async render(game) {
-		if (this._audio.ended) {
-			// If the song has ended, return to the level select.
-			await game.view(new LevelSelect());
-		}
-
-		// Get the distance travelled and in tiles and remainder.
-		let distance = game.elapsed * this._speed;
-		let tile = Math.floor(distance);
-
-		// Render the child views.
-		await super.render(game);
-
-		// Check for collisions.
-		if (game.state.jump_time < 0) {
-			// If not mid-jump, check if the player is in an obstacle.
-			for (let obstacle_tile of this._map) {
-				// If the player is within the spike range, failure has occurred.
-				if (obstacle_tile - 0.75 <= distance && distance <= obstacle_tile + 0.75) {
-					// Stop the game.
-					game.state.game_over = true;
-					game.state.game_over_time = game.elapsed;
-
-					// Pause the music.
-					this._audio.pause();
-				}
-			}
-		}
-	}
-
-	async start(game) {
-		game.state.speed = this._speed;
-
-		await super.start(game);
-
+	async start(game, data) {
 		// Start the music.
+		this._audio.volume = 1;
+		this._audio.currentTime = 0;
 		this._audio.play();
+
+		this._jump_time = -1;
+		this._game_over = false;
+
+		await this.forward('start', game, { speed: this._speed });
 	}
 
-	stop() {
+	async stop(game, data) {
 		// Stop the music.
 		this._audio.pause();
 		this._audio.currentTime = 0;
+	}
+
+	async render(game, data) {
+		if (this._game_over) {
+			// If the game is over, adjust the volume to fade out.
+			let elapsed = this._game_over_time - data.time;
+			this._audio.volume = Math.max(elapsed / 250 + 1, 0);
+		} else if (this._audio.ended) {
+			// Otherwise, trigger a win if the audio has ended.
+			await game.trigger('win', { time: data.time });
+		}
+
+		// Get the distance travelled and in tiles and remainder.
+		let distance = data.time * this._speed;
+		let tile = Math.floor(distance);
+		let offset = distance - tile;
+
+		// Check for collisions.
+		if (this._jump_time < 0 && !this._game_over) {
+			// If not mid-jump, check if the player is in an obstacle.
+			for (let spike_tile of this._spike_tiles) {
+				// If the player is within the spike range, failure has occurred.
+				if (spike_tile - 0.7 <= distance && distance <= spike_tile + 0.7) {
+					// Trigger a lose event.
+					await game.trigger('lose', { time: data.time });
+				}
+			}
+		}
+
+		// Render the child views.
+		await this.forward('render', game, Object.assign({}, data, {
+			distance: distance,
+			tile: tile,
+			offset: offset,
+			speed: this._speed,
+		}));
+	}
+
+	async jump(game, data) {
+		this._jump_time = data.time;
+
+		this.forward('jump', game, data);
+	}
+
+	async land(game, data) {
+		this._jump_time = -1;
+
+		this.forward('land', game, data);
+	}
+
+	async lose(game, data) {
+		this._game_over = true;
+		this._game_over_time = data.time;
+
+		this.forward('lose', game, data);
 	}
 }
 

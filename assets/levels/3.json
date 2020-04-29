@@ -1,20 +1,20 @@
 {
 	"audio": {
 		"beats_per_minute": 175,
-		"source": "assets/audio/Zoe Song (Rhythm Game).wav"
+		"source": "./assets/audio/Zoe Song (Rhythm Game).wav"
 	},
 	"background": {
 		"top": "#ed7a99",
 		"bottom": "#55cdfc"
 	},
 	"parallax": {
-		"source": "assets/images/Parallax3.png"
+		"source": "./assets/images/Parallax3.png"
 	},
 	"ground": {
-		"source": "assets/images/Tile_3.png"
+		"source": "./assets/images/Tile_3.png"
 	},
 	"spikes": {
-		"source": "assets/images/Spike_Tile_3.png"
+		"source": "./assets/images/Spike_Tile_3.png"
 	},
 	"player": {
 		"jump": {
@@ -23,7 +23,7 @@
 			"tolerance": 0.7
 		},
 		"frames": 4,
-		"source": "assets/images/Player_Idle_Square-Sheet.png"
+		"source": "./assets/images/Player_Idle_Square-Sheet.png"
 	},
 	"map": {
 		"spike_times": []

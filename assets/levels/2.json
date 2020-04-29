@@ -1,20 +1,20 @@
 {
 	"audio": {
 		"beats_per_minute": 135,
-		"source": "assets/audio/Positive Force (Remix, for fun).wav"
+		"source": "./assets/audio/Positive Force (Remix, for fun).wav"
 	},
 	"background": {
 		"top": "#ff7ccc",
 		"bottom": "#ffb768"
 	},
 	"parallax": {
-		"source": "assets/images/Parallax2.png"
+		"source": "./assets/images/Parallax2.png"
 	},
 	"ground": {
-		"source": "assets/images/Tile_2.png"
+		"source": "./assets/images/Tile_2.png"
 	},
 	"spikes": {
-		"source": "assets/images/Spike_Tile_2.png"
+		"source": "./assets/images/Spike_Tile_2.png"
 	},
 	"player": {
 		"jump": {
@@ -23,7 +23,7 @@
 			"tolerance": 0.7
 		},
 		"frames": 4,
-		"source": "assets/images/Player_Idle_Square-Sheet.png"
+		"source": "./assets/images/Player_Idle_Square-Sheet.png"
 	},
 	"map": {
 		"spike_times": []

@@ -13,6 +13,7 @@ async function loadAudio(url) {
 			reject(event);
 		});
 
+		audio.preload = 'auto';
 		audio.src = url;
 	});
 }

@@ -1,20 +1,20 @@
 {
 	"audio": {
 		"beats_per_minute": 120,
-		"source": "assets/audio/Level 1 Alternate.wav"
+		"source": "./assets/audio/Level 1 Alternate.wav"
 	},
 	"background": {
 		"top": "#2efe92",
 		"bottom": "#42407a"
 	},
 	"parallax": {
-		"source": "assets/images/Parallax1.png"
+		"source": "./assets/images/Parallax1.png"
 	},
 	"ground": {
-		"source": "assets/images/Base_Tile_Square.png"
+		"source": "./assets/images/Base_Tile_Square.png"
 	},
 	"spikes": {
-		"source": "assets/images/Spike_Tile_Square.png"
+		"source": "./assets/images/Spike_Tile_Square.png"
 	},
 	"player": {
 		"jump": {
@@ -23,7 +23,7 @@
 			"tolerance": 0.7
 		},
 		"frames": 4,
-		"source": "assets/images/Player_Idle_Square-Sheet.png"
+		"source": "./assets/images/Player_Idle_Square-Sheet.png"
 	},
 	"map": {
 		"spike_times": [

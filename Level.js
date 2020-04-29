@@ -15,6 +15,7 @@ async function loadAudio(url) {
 
 		audio.preload = 'auto';
 		audio.src = url;
+		audio.load();
 	});
 }
 

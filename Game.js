@@ -1,3 +1,5 @@
+window.presses = [];
+
 class Game {
 	// Create a game using a given canvas, target width and height, and tile size.
 	constructor(canvas, w, h, tile_size) {
@@ -167,6 +169,8 @@ class Game {
 
 			this._pressing = false;
 		}
+
+		window.presses.push(this._time);
 	}
 
 	// Register a new view in the game.

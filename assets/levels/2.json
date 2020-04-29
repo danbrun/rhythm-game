@@ -1,7 +1,7 @@
 {
 	"audio": {
 		"beats_per_minute": 135,
-		"source": "./assets/audio/Positive Force (Remix, for fun).wav"
+		"source": "./assets/audio/Positive Force (Remix, for fun).mp3"
 	},
 	"background": {
 		"top": "#ff7ccc",

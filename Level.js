@@ -331,7 +331,7 @@ class LevelView extends MultiView {
 			this._audio.volume = Math.max(elapsed / 250 + 1, 0);
 		}
 
-		if (this._audio.ended && !this._won) {
+		if (this._audio.ended && !this._won && !this._lost) {
 			// Otherwise, trigger a win if the audio has ended.
 			await game.trigger('win', { time: data.time });
 		}

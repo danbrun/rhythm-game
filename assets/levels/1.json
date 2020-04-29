@@ -1,7 +1,7 @@
 {
 	"audio": {
 		"beats_per_minute": 120,
-		"source": "./assets/audio/Level 1 Alternate.mp3"
+		"source": "./assets/audio/Level 1 Alternate.wav"
 	},
 	"background": {
 		"top": "#2efe92",
